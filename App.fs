@@ -231,3 +231,8 @@ let app =
             appFooter
         }
     }
+
+type App() =
+    inherit FunComponent()
+
+    override _.Render () = app

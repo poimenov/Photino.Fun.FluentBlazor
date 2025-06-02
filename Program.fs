@@ -6,10 +6,12 @@ open Microsoft.FluentUI.AspNetCore.Components
 open Photino.Fun.FluentBlazor
 open System
 
+[<STAThread>]
 [<EntryPoint>]
 let main args =
     let builder = PhotinoBlazorAppBuilder.CreateDefault(args)
 
+    builder.RootComponents.Add<App>("#app")
     builder.Services.AddFunBlazorWasm() |> ignore
     builder.Services.AddFluentUIComponents() |> ignore
     builder.Services.AddSingleton<IPlatformService, PlatformService>() |> ignore
@@ -19,7 +21,6 @@ let main args =
     |> ignore
 
     let application = builder.Build()
-    application.RootComponents.AddFunBlazor("#app", app) |> ignore
 
     // customize window
     application.MainWindow
