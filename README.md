@@ -4,7 +4,7 @@
 This is a F# project template for the create [Photino.net](https://www.tryphotino.io/) desktop application with using [Fun.Blazor](https://slaveoftime.github.io/Fun.Blazor.Docs/) and [FluentUI.Blazor](https://www.fluentui-blazor.net/).
 
 ### Prerequisites
-.Net SDK 8.0
+.Net SDK 10.0
 
 ### Installation
 

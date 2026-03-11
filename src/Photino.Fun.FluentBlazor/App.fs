@@ -6,6 +6,8 @@ open System.Linq
 open Microsoft.AspNetCore.Components.Web
 open Microsoft.AspNetCore.Components.Routing
 open Microsoft.FluentUI.AspNetCore.Components
+open Microsoft.Extensions.Localization
+open Microsoft.Extensions.Options
 open FSharp.Data
 open Fun.Blazor
 open Fun.Blazor.Router
@@ -15,68 +17,64 @@ type WeatherForecastProvider = JsonProvider<""" [{"date": "2018-05-06", "tempera
 type IShareStore with
     member store.Count = store.CreateCVal(nameof store.Count, 0)
     member store.IsMenuOpen = store.CreateCVal(nameof store.IsMenuOpen, true)
+    member store.Theme = store.CreateCVal(nameof store.Theme, DesignThemeModes.Light)
 
     member store.WeatherData =
         store.CreateCVal(nameof store.WeatherData, Enumerable.Empty<WeatherForecastProvider.Root>().AsQueryable())
 
 let homePage =
-    fragment {
-        SectionContent'' {
-            SectionName "Title"
-            "Home"
-        }
+    html.inject (fun (localizer: IStringLocalizer<SharedResources>) ->
+        fragment {
+            FluentLabel'' {
+                Typo Typography.H1
+                Color Color.Accent
+                localizer["Home"]
+            }
 
-        FluentLabel'' {
-            Typo Typography.H1
-            Color Color.Accent
-            "Hi from FunBlazor"
-        }
-    }
+            p { localizer["HomeText"] }
+        })
 
 let fetchDataPage =
-    html.inject (fun (store: IShareStore, hook: IComponentHook) ->
+    html.inject (fun (store: IShareStore, hook: IComponentHook, localizer: IStringLocalizer<SharedResources>) ->
         hook.AddInitializedTask(fun () ->
             task {
                 if not (store.WeatherData.Value.Any()) then
-                    let! data = WeatherForecastProvider.AsyncLoad("wwwroot/sample-data/weather.json")
+                    let! data = WeatherForecastProvider.AsyncLoad "wwwroot/sample-data/weather.json"
                     store.WeatherData.Publish(data.AsQueryable<WeatherForecastProvider.Root>())
             })
 
         fragment {
-            SectionContent'' {
-                SectionName "Title"
-                "Async Fetch Data"
-            }
-
             FluentLabel'' {
                 Typo Typography.H1
                 Color Color.Accent
-                "Fetch Data"
+                localizer["WeatherHeader"]
             }
+
+            p { localizer["WeatherText"] }
 
             adapt {
                 FluentDataGrid'' {
-                    Items(store.WeatherData.Value)
+                    Items store.WeatherData.Value
 
                     PropertyColumn'' {
-                        Title "Date"
-                        Property(fun (x: WeatherForecastProvider.Root) -> x.Date.ToString("dd MMM yyyy"))
+                        Title(string localizer["Date"])
+                        Property(fun (x: WeatherForecastProvider.Root) -> x.Date.ToString "dd MMM yyyy")
                     }
 
                     PropertyColumn'' {
-                        Title "Temp. (C)"
+                        Title(string localizer["TempC"])
                         Property(fun (x: WeatherForecastProvider.Root) -> x.TemperatureC)
                     }
 
                     PropertyColumn'' {
-                        Title "Temp. (F)"
+                        Title(string localizer["TempF"])
 
                         Property(fun (x: WeatherForecastProvider.Root) ->
-                            Math.Round((float x.TemperatureC) * (9.0 / 5.0) + 32.0, 2))
+                            Math.Round(float x.TemperatureC * (9.0 / 5.0) + 32.0, 2))
                     }
 
                     PropertyColumn'' {
-                        Title "Summary"
+                        Title(string localizer["Summary"])
                         Property(fun (x: WeatherForecastProvider.Root) -> x.Summary)
                     }
                 }
@@ -84,24 +82,19 @@ let fetchDataPage =
         })
 
 let counterPage =
-    html.inject (fun (store: IShareStore, snackbar: IToastService) ->
+    html.inject (fun (store: IShareStore, snackbar: IToastService, localizer: IStringLocalizer<SharedResources>) ->
         fragment {
-            SectionContent'' {
-                SectionName "Title"
-                "Counter"
-            }
-
             FluentLabel'' {
                 Typo Typography.H1
                 Color Color.Accent
-                "Counter"
+                localizer["Counter"]
             }
 
             adapt {
                 let! count = store.Count
 
-                div {
-                    "Here is the count: "
+                p {
+                    localizer["CurrentCount"]
                     count
                 }
             }
@@ -111,30 +104,64 @@ let counterPage =
 
                 OnClick(fun _ ->
                     store.Count.Publish((+) 1)
-                    snackbar.ShowSuccess($"Count = {store.Count.Value}"))
+                    let currCount = string localizer["CurrentCount"]
+                    snackbar.ShowSuccess $"{currCount} {store.Count.Value}")
 
-                "Increase by 1"
+                localizer["ClickMe"]
             }
         })
 
 let appHeader =
-    FluentHeader'' {
-        FluentStack'' {
-            Orientation Orientation.Horizontal
+    html.inject
+        (fun (store: IShareStore, options: IOptions<AppSettings>, localizer: IStringLocalizer<SharedResources>) ->
+            FluentHeader'' {
+                FluentStack'' {
+                    Orientation Orientation.Horizontal
+                    HorizontalGap 2
 
-            img {
-                src "favicon.ico"
+                    img {
+                        src AppSettings.FavIconFileName
+                        style { height "40px" }
+                    }
 
-                style { height "28px" }
-            }
+                    FluentLabel'' {
+                        Typo Typography.H2
+                        Color Color.Fill
+                        style' "cursor: default;"
+                        AppSettings.ApplicationName
+                    }
 
-            FluentLabel'' {
-                Typo Typography.H2
-                Color Color.Fill
-                "Photino.Fun.FluentBlazor"
-            }
-        }
-    }
+                    FluentSpacer''
+
+                    adapt {
+                        let! theme = store.Theme
+
+                        FluentDesignTheme'' {
+                            StorageName "theme"
+                            Mode store.Theme.Value
+                            OfficeColor options.Value.AccentColor
+
+                            OnLoaded(fun args ->
+                                if args.IsDark then
+                                    store.Theme.Publish DesignThemeModes.Dark)
+                        }
+
+                        FluentButton'' {
+                            Appearance Appearance.Accent
+                            IconStart(Icons.Regular.Size20.DarkTheme())
+                            title' (string (localizer["SwitchTheme"]))
+
+                            OnClick(fun _ ->
+                                store.Theme.Publish(
+                                    if theme = DesignThemeModes.Dark then
+                                        DesignThemeModes.Light
+                                    else
+                                        DesignThemeModes.Dark
+                                ))
+                        }
+                    }
+                }
+            })
 
 let appFooter =
     html.inject (fun (los: ILinkOpeningService) ->
@@ -159,7 +186,7 @@ let appFooter =
         })
 
 let navmenus =
-    html.injectWithNoKey (fun (store: IShareStore) ->
+    html.injectWithNoKey (fun (store: IShareStore, localizer: IStringLocalizer<SharedResources>) ->
         adaptiview () {
             let! binding = store.IsMenuOpen.WithSetter()
 
@@ -172,21 +199,24 @@ let navmenus =
                     Href "/"
                     Match NavLinkMatch.All
                     Icon(Icons.Regular.Size20.Home())
-                    "Home"
+                    Tooltip(string (localizer["Home"]))
+                    localizer["Home"]
                 }
 
                 FluentNavLink'' {
                     Href "/counter"
                     Match NavLinkMatch.Prefix
                     Icon(Icons.Regular.Size20.NumberSymbolSquare())
-                    "Counter"
+                    Tooltip(string (localizer["Counter"]))
+                    localizer["Counter"]
                 }
 
                 FluentNavLink'' {
                     Href "/fetchdata"
                     Match NavLinkMatch.Prefix
                     Icon(Icons.Regular.Size20.Temperature())
-                    "Fetch data"
+                    Tooltip(string (localizer["Weather"]))
+                    localizer["Weather"]
                 }
             }
         })
@@ -235,4 +265,4 @@ let app =
 type App() =
     inherit FunComponent()
 
-    override _.Render () = app
+    override _.Render() = app
