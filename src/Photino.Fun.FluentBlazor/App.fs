@@ -25,9 +25,8 @@ type IShareStore with
 let homePage =
     html.inject (fun (localizer: IStringLocalizer<SharedResources>) ->
         fragment {
-            FluentLabel'' {
-                Typo Typography.H1
-                Color Color.Accent
+            SectionContent'' {
+                SectionName "Title"
                 localizer["Home"]
             }
 
@@ -39,54 +38,57 @@ let fetchDataPage =
         hook.AddInitializedTask(fun () ->
             task {
                 if not (store.WeatherData.Value.Any()) then
+                    //imitation of waiting for a response on the first call
+                    let! t = Async.Sleep 2000
                     let! data = WeatherForecastProvider.AsyncLoad "wwwroot/sample-data/weather.json"
                     store.WeatherData.Publish(data.AsQueryable<WeatherForecastProvider.Root>())
             })
 
         fragment {
-            FluentLabel'' {
-                Typo Typography.H1
-                Color Color.Accent
+            SectionContent'' {
+                SectionName "Title"
                 localizer["WeatherHeader"]
             }
 
             p { localizer["WeatherText"] }
 
             adapt {
-                FluentDataGrid'' {
-                    Items store.WeatherData.Value
+                if not (store.WeatherData.Value.Any()) then
+                    FluentProgressRing''
+                else
+                    FluentDataGrid'' {
+                        Items store.WeatherData.Value
 
-                    PropertyColumn'' {
-                        Title(string localizer["Date"])
-                        Property(fun (x: WeatherForecastProvider.Root) -> x.Date.ToString "dd MMM yyyy")
+                        PropertyColumn'' {
+                            Title(string localizer["Date"])
+                            Property(fun (x: WeatherForecastProvider.Root) -> x.Date.ToString "dd MMM yyyy")
+                        }
+
+                        PropertyColumn'' {
+                            Title(string localizer["TempC"])
+                            Property(fun (x: WeatherForecastProvider.Root) -> x.TemperatureC)
+                        }
+
+                        PropertyColumn'' {
+                            Title(string localizer["TempF"])
+
+                            Property(fun (x: WeatherForecastProvider.Root) ->
+                                Math.Round(float x.TemperatureC * (9.0 / 5.0) + 32.0, 2))
+                        }
+
+                        PropertyColumn'' {
+                            Title(string localizer["Summary"])
+                            Property(fun (x: WeatherForecastProvider.Root) -> x.Summary)
+                        }
                     }
-
-                    PropertyColumn'' {
-                        Title(string localizer["TempC"])
-                        Property(fun (x: WeatherForecastProvider.Root) -> x.TemperatureC)
-                    }
-
-                    PropertyColumn'' {
-                        Title(string localizer["TempF"])
-
-                        Property(fun (x: WeatherForecastProvider.Root) ->
-                            Math.Round(float x.TemperatureC * (9.0 / 5.0) + 32.0, 2))
-                    }
-
-                    PropertyColumn'' {
-                        Title(string localizer["Summary"])
-                        Property(fun (x: WeatherForecastProvider.Root) -> x.Summary)
-                    }
-                }
             }
         })
 
 let counterPage =
     html.inject (fun (store: IShareStore, snackbar: IToastService, localizer: IStringLocalizer<SharedResources>) ->
         fragment {
-            FluentLabel'' {
-                Typo Typography.H1
-                Color Color.Accent
+            SectionContent'' {
+                SectionName "Title"
                 localizer["Counter"]
             }
 
@@ -252,6 +254,12 @@ let app =
 
                     div {
                         class' "content"
+
+                        FluentLabel'' {
+                            Typo Typography.H1
+                            Color Color.Accent
+                            SectionOutlet'' { SectionName "Title" }
+                        }
 
                         routes
                     }
